@@ -201,29 +201,39 @@ def group_into_spreads(spine_properties):
 def _load_small_thumb(path, target_h):
     """大きな画像でもメモリを使いすぎないよう、低解像度のまま縮小して読み込む。
 
-    JPEGはPillowのdraftモードでデコード時点から縮小できるため、フル解像度
-    (写真集だと2000x3000px超)をそのままメモリ展開してからresizeするのに
-    比べて大幅にメモリを節約できる(Render無料プランの512MB上限対策)。
+    Image.draft()(JPEGのみ対応)でデコード時点から縮小することに加え、
+    Image.Image.thumbnail()を使って段階的に縮小することで、フル解像度
+    (写真集だと2000x3000px超)をそのままメモリ展開するのを避ける
+    (Render無料プランの512MB上限対策)。
     """
     with Image.open(path) as im:
         if im.format == "JPEG":
-            im.draft("RGB", (target_h * 2, target_h * 2))
+            im.draft("RGB", (target_h, target_h))
         im = im.convert("RGB")
-        w = max(1, round(im.width * target_h / im.height))
-        thumb = im.resize((w, target_h), Image.LANCZOS)
+        im.thumbnail((target_h * 10, target_h), Image.LANCZOS)
+        # thumbnailはin-place操作だが、元ファイルハンドルから独立した
+        # 新しいバッファとして確実にコピーしておく(withブロックを抜けた後も使うため)
+        thumb = im.copy()
     return thumb
 
 
-def build_preview_thumbnails(image_paths, spreads, max_spreads=60):
+def build_preview_thumbnails(image_paths, spreads, max_spreads=20):
     """見開きごとのサムネイル(base64 JPEG)のリストを返す。
 
     image_paths: spine順の代表画像パスのリスト(Noneもあり得る)
     spreads: group_into_spreads() の戻り値
+
+    max_spreads はデフォルトで少なめに制限している。QAチェックの目的は
+    「見開き構成が壊れていないか」の目視確認であり、冒頭数見開きを見れば
+    十分なことが多いため、写真集全体(数十〜百見開き)を毎回処理して
+    メモリを使い切るよりも安全側に倒している。
     """
+    import gc
+
     thumbs = []
     truncated = len(spreads) > max_spreads
     h = PREVIEW_PAGE_HEIGHT
-    for spread in spreads[:max_spreads]:
+    for n, spread in enumerate(spreads[:max_spreads]):
         resized = []
         for idx in spread:
             path = image_paths[idx] if idx < len(image_paths) else None
@@ -248,6 +258,10 @@ def build_preview_thumbnails(image_paths, spreads, max_spreads=60):
         buf = io.BytesIO()
         canvas.save(buf, format="JPEG", quality=80)
         thumbs.append(base64.b64encode(buf.getvalue()).decode("ascii"))
+
+        del resized, canvas, buf
+        if n % 4 == 3:
+            gc.collect()
 
     return thumbs, truncated
 
