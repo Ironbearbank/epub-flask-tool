@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>生成結果 - marche epubツール</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header>
+  <h1>marche epubツール</h1>
+  <p>生成結果プレビュー</p>
+</header>
+<main>
+  <div class="card">
+    <h2>{{ title }}</h2>
+    <table>
+      <tr><th>ページ数(本文)</th><td>{{ result.pages }}</td></tr>
+      <tr><th>統一解像度</th><td>{{ result.resolution }}</td></tr>
+      <tr><th>表紙</th><td>{{ 'あり' if result.has_cover else 'なし' }}</td></tr>
+    </table>
+
+    <a href="{{ url_for('download', token=download_token) }}">
+      <button type="button">epubをダウンロード</button>
+    </a>
+
+    <div class="warn-box" style="margin-top:20px;">
+      ⚠ 下のプレビューは見開き構成の簡易シミュレーションです。実際のmarche_viewer
+      での見え方と完全に一致するとは限らないため、最終的には実機(marche_viewer)
+      でも必ずご確認ください。
+    </div>
+
+    {% if result.preview_truncated %}
+      <p class="hint">ページ数が多いため、プレビューは先頭部分のみ表示しています。</p>
+    {% endif %}
+
+    <div style="margin-top:20px;">
+      {% for thumb in result.preview_thumbs %}
+        <div style="margin-bottom:14px;">
+          <img src="data:image/jpeg;base64,{{ thumb }}" style="max-width:100%; border:1px solid #ddd; border-radius:4px;">
+        </div>
+      {% endfor %}
+    </div>
+
+    <a class="back" href="{{ url_for('index') }}">← トップに戻る</a>
+  </div>
+</main>
+</body>
+</html>

@@ -53,6 +53,24 @@
           </tr>
         {% endfor %}
       </table>
+
+      {% if result.preview_thumbs %}
+        <h2 style="margin-top:32px;">見開き構成プレビュー(簡易シミュレーション)</h2>
+        <div class="warn-box">
+          ⚠ spineのプロパティから推定した簡易プレビューです。実際のmarche_viewerでの
+          見え方と完全に一致するとは限らないため、最終的には実機でも必ずご確認ください。
+        </div>
+        {% if result.preview_truncated %}
+          <p class="hint">ページ数が多いため、プレビューは先頭部分のみ表示しています。</p>
+        {% endif %}
+        <div style="margin-top:16px;">
+          {% for thumb in result.preview_thumbs %}
+            <div style="margin-bottom:14px;">
+              <img src="data:image/jpeg;base64,{{ thumb }}" style="max-width:100%; border:1px solid #ddd; border-radius:4px;">
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
     {% endif %}
 
     <a class="back" href="{{ url_for('index') }}">← トップに戻る</a>

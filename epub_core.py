@@ -7,6 +7,8 @@ check_epub_images.py(QAチェック)と build_epub_from_images.py(画像フォ�
 元のCLIツールのdocstringおよびメモリ project_epub_indesign_vs_svg_compat を参照。
 """
 
+import base64
+import io
 import os
 import re
 import shutil
@@ -16,6 +18,8 @@ import zipfile
 from collections import Counter
 
 from PIL import Image
+
+PREVIEW_PAGE_HEIGHT = 360  # プレビューサムネイル1ページあたりの高さ(px)
 
 OPF_NS = "{http://www.idpf.org/2007/opf}"
 
@@ -134,6 +138,112 @@ def is_ascii_safe(name):
     return all(ord(c) < 128 for c in name) and " " not in name
 
 
+def collect_representative_images(opf_dir, spine_hrefs):
+    """spine順に、各ページを代表する画像パスを1枚ずつ返す(プレビュー用)。
+
+    1ページに複数画像(オーバーレイ等)がある場合は、ファイルサイズが
+    最大のものを代表画像とみなす(小さな装飾オーバーレイを避けるため)。
+    """
+    src_pattern = re.compile(r'<(?:img|image)\b[^>]*?(?:src|xlink:href)="([^"]+)"')
+    reps = []
+    for href in spine_hrefs:
+        path = os.path.join(opf_dir, href)
+        if not os.path.exists(path):
+            reps.append(None)
+            continue
+        try:
+            content = open(path, encoding="utf-8").read()
+        except UnicodeDecodeError:
+            reps.append(None)
+            continue
+        candidates = []
+        for src in src_pattern.findall(content):
+            img_path = os.path.normpath(os.path.join(os.path.dirname(path), src))
+            if os.path.exists(img_path):
+                candidates.append(img_path)
+        if not candidates:
+            reps.append(None)
+            continue
+        candidates.sort(key=lambda p: os.path.getsize(p), reverse=True)
+        reps.append(candidates[0])
+    return reps
+
+
+def group_into_spreads(spine_properties):
+    """spineのproperties列から、見開き(1〜2ページ)のグルーピングを推定する。
+
+    ルール(今回のFRUiTS対応で実機確認した挙動をもとにしたヒューリスティック):
+    - page-spread-center(表紙など) は常に単独。
+    - page-spread-left の直後に page-spread-right が続く場合のみペアになる。
+    - それ以外(center/連続するleft/連続するright等)は単独ページとして扱う。
+
+    あくまで簡易プレビュー用の近似であり、実際のmarche_viewer表示を
+    100%保証するものではない(実機確認は別途必須)。
+    """
+    spreads = []
+    i = 0
+    n = len(spine_properties)
+    while i < n:
+        prop = spine_properties[i]
+        if "page-spread-center" in prop:
+            spreads.append([i])
+            i += 1
+            continue
+        if "page-spread-left" in prop and i + 1 < n and "page-spread-right" in spine_properties[i + 1]:
+            spreads.append([i, i + 1])
+            i += 2
+            continue
+        spreads.append([i])
+        i += 1
+    return spreads
+
+
+def build_preview_thumbnails(image_paths, spreads, max_spreads=120):
+    """見開きごとのサムネイル(base64 JPEG)のリストを返す。
+
+    image_paths: spine順の代表画像パスのリスト(Noneもあり得る)
+    spreads: group_into_spreads() の戻り値
+    """
+    thumbs = []
+    truncated = len(spreads) > max_spreads
+    for spread in spreads[:max_spreads]:
+        imgs = []
+        for idx in spread:
+            path = image_paths[idx] if idx < len(image_paths) else None
+            if path and os.path.exists(path):
+                try:
+                    imgs.append(Image.open(path).convert("RGB"))
+                except Exception:
+                    imgs.append(None)
+            else:
+                imgs.append(None)
+
+        h = PREVIEW_PAGE_HEIGHT
+        resized = []
+        for im in imgs:
+            if im is None:
+                resized.append(None)
+                continue
+            w = max(1, round(im.width * h / im.height))
+            resized.append(im.resize((w, h), Image.LANCZOS))
+
+        total_w = sum((im.width if im else int(h * 0.71)) for im in resized) or 1
+        canvas = Image.new("RGB", (total_w, h), (40, 40, 40))
+        x = 0
+        for im in resized:
+            if im is None:
+                x += int(h * 0.71)
+                continue
+            canvas.paste(im, (x, 0))
+            x += im.width
+
+        buf = io.BytesIO()
+        canvas.save(buf, format="JPEG", quality=80)
+        thumbs.append(base64.b64encode(buf.getvalue()).decode("ascii"))
+
+    return thumbs, truncated
+
+
 def check_spread_structure(spine_properties, generator):
     warnings = []
     is_indesign = "indesign" in generator.lower()
@@ -231,6 +341,10 @@ def run_qa_check(epub_path, tolerance=0.01):
 
         spread_warnings = check_spread_structure(spine_properties, generator)
 
+        spreads = group_into_spreads(spine_properties)
+        rep_images = collect_representative_images(opf_dir, spine_hrefs)
+        preview_thumbs, preview_truncated = build_preview_thumbnails(rep_images, spreads)
+
         return {
             "total_pages": len(records),
             "viewport": viewport,
@@ -242,6 +356,8 @@ def run_qa_check(epub_path, tolerance=0.01):
             "issues": issues,
             "spread_warnings": spread_warnings,
             "ok": not issues,
+            "preview_thumbs": preview_thumbs,
+            "preview_truncated": preview_truncated,
         }
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -299,6 +415,8 @@ def build_epub_from_images(page_paths, cover_path, title, output_path,
         manifest_items = []
         spine_items = []
         toc_entries = []
+        rep_image_paths = []
+        spine_properties = []
 
         if cover_path:
             cover_im = load_and_normalize(cover_path, target_size)
@@ -310,6 +428,8 @@ def build_epub_from_images(page_paths, cover_path, title, output_path,
             spine_items.append('    <itemref linear="yes" idref="p-cover" properties="rendition:page-spread-center"/>')
             manifest_items.append('    <item id="cover-img" href="image/cover.jpg" media-type="image/jpeg" properties="cover-image"/>')
             toc_entries.append('<li><a href="xhtml/p-cover.xhtml">Cover</a></li>')
+            rep_image_paths.append(os.path.join(image_dir, "cover.jpg"))
+            spine_properties.append("page-spread-center")
 
         sides = ["left", "right"] if first_side == "left" else ["right", "left"]
         for i, src_path in enumerate(page_paths, start=1):
@@ -322,6 +442,8 @@ def build_epub_from_images(page_paths, cover_path, title, output_path,
             side = sides[(i - 1) % 2]
             spine_items.append(f'    <itemref linear="yes" idref="{pid}" properties="page-spread-{side}"/>')
             manifest_items.append(f'    <item id="img-{i:03d}" href="image/{pid}.jpg" media-type="image/jpeg"/>')
+            rep_image_paths.append(os.path.join(image_dir, f"{pid}.jpg"))
+            spine_properties.append(f"page-spread-{side}")
 
         manifest_items.append('    <item id="nav" href="navigation-documents.xhtml" media-type="application/xhtml+xml" properties="nav"/>')
         manifest_items.append('    <item id="css" href="style/fixed-layout-jp.css" media-type="text/css"/>')
@@ -381,6 +503,15 @@ def build_epub_from_images(page_paths, cover_path, title, output_path,
                         continue
                     zf.write(full, rel, compress_type=zipfile.ZIP_DEFLATED)
 
-        return {"pages": len(page_paths), "resolution": f"{W}x{H}", "has_cover": bool(cover_path)}
+        spreads = group_into_spreads(spine_properties)
+        preview_thumbs, preview_truncated = build_preview_thumbnails(rep_image_paths, spreads)
+
+        return {
+            "pages": len(page_paths),
+            "resolution": f"{W}x{H}",
+            "has_cover": bool(cover_path),
+            "preview_thumbs": preview_thumbs,
+            "preview_truncated": preview_truncated,
+        }
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)

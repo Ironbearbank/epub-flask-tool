@@ -1,14 +1,33 @@
 import os
 import tempfile
+import time
 import traceback
+import uuid
 
-from flask import Flask, render_template, request, send_file, flash, redirect, url_for
+from flask import Flask, render_template, request, send_file, flash, redirect, url_for, abort
 
 import epub_core
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 app.config["MAX_CONTENT_LENGTH"] = 512 * 1024 * 1024  # 512MB (写真集epubは数百MBになりうるため)
+
+# 生成したepubを一時的に保持し、プレビュー確認後にダウンロードできるようにする。
+# プロセスメモリ上に保持するだけの簡易実装(内部ツール規模を想定)。
+_PENDING_DOWNLOADS = {}
+_DOWNLOAD_TTL_SECONDS = 60 * 60  # 1時間で破棄
+
+
+def _cleanup_pending_downloads():
+    now = time.time()
+    expired = [t for t, v in _PENDING_DOWNLOADS.items() if now - v["created"] > _DOWNLOAD_TTL_SECONDS]
+    for t in expired:
+        entry = _PENDING_DOWNLOADS.pop(t, None)
+        if entry:
+            try:
+                os.remove(entry["path"])
+            except OSError:
+                pass
 
 
 @app.route("/")
@@ -41,6 +60,8 @@ def check():
 
 @app.route("/build", methods=["POST"])
 def build():
+    _cleanup_pending_downloads()
+
     title = request.form.get("title", "").strip()
     direction = request.form.get("direction", "rtl")
     first_side = request.form.get("first_side", "left")
@@ -72,9 +93,16 @@ def build():
             cover_path = os.path.join(tmp, f"cover{ext}")
             cover_file.save(cover_path)
 
-        output_path = os.path.join(tmp, "output.epub")
+        # ダウンロード用ファイルは、このリクエスト用の一時ディレクトリの外
+        # (プロセス全体で共有する場所)に保存し、TemporaryDirectory終了後も残す。
+        safe_title = "".join(c for c in title if c.isalnum() or c in " _-") or "output"
+        download_name = f"{safe_title}.epub"
+        token = uuid.uuid4().hex
+        persist_dir = tempfile.mkdtemp(prefix="epub_build_result_")
+        output_path = os.path.join(persist_dir, "output.epub")
+
         try:
-            epub_core.build_epub_from_images(
+            result = epub_core.build_epub_from_images(
                 page_paths, cover_path, title, output_path,
                 direction=direction, first_side=first_side,
             )
@@ -83,20 +111,30 @@ def build():
             flash(f"生成中にエラーが発生しました: {e}")
             return redirect(url_for("index"))
 
-        safe_title = "".join(c for c in title if c.isalnum() or c in " _-") or "output"
-        download_name = f"{safe_title}.epub"
-        # send_file needs the file to still exist after the TemporaryDirectory
-        # context closes, so read into memory for small/medium books; for very
-        # large books this copies once, which is acceptable for this tool's scale.
-        with open(output_path, "rb") as f:
-            data = f.read()
+    _PENDING_DOWNLOADS[token] = {
+        "path": output_path,
+        "filename": download_name,
+        "created": time.time(),
+    }
 
-    import io
+    return render_template(
+        "build_result.html",
+        title=title,
+        result=result,
+        download_token=token,
+    )
+
+
+@app.route("/download/<token>")
+def download(token):
+    entry = _PENDING_DOWNLOADS.get(token)
+    if not entry or not os.path.exists(entry["path"]):
+        abort(404)
     return send_file(
-        io.BytesIO(data),
+        entry["path"],
         mimetype="application/epub+zip",
         as_attachment=True,
-        download_name=download_name,
+        download_name=entry["filename"],
     )
 
 
