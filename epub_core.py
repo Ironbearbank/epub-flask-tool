@@ -198,7 +198,23 @@ def group_into_spreads(spine_properties):
     return spreads
 
 
-def build_preview_thumbnails(image_paths, spreads, max_spreads=120):
+def _load_small_thumb(path, target_h):
+    """大きな画像でもメモリを使いすぎないよう、低解像度のまま縮小して読み込む。
+
+    JPEGはPillowのdraftモードでデコード時点から縮小できるため、フル解像度
+    (写真集だと2000x3000px超)をそのままメモリ展開してからresizeするのに
+    比べて大幅にメモリを節約できる(Render無料プランの512MB上限対策)。
+    """
+    with Image.open(path) as im:
+        if im.format == "JPEG":
+            im.draft("RGB", (target_h * 2, target_h * 2))
+        im = im.convert("RGB")
+        w = max(1, round(im.width * target_h / im.height))
+        thumb = im.resize((w, target_h), Image.LANCZOS)
+    return thumb
+
+
+def build_preview_thumbnails(image_paths, spreads, max_spreads=60):
     """見開きごとのサムネイル(base64 JPEG)のリストを返す。
 
     image_paths: spine順の代表画像パスのリスト(Noneもあり得る)
@@ -206,26 +222,18 @@ def build_preview_thumbnails(image_paths, spreads, max_spreads=120):
     """
     thumbs = []
     truncated = len(spreads) > max_spreads
+    h = PREVIEW_PAGE_HEIGHT
     for spread in spreads[:max_spreads]:
-        imgs = []
+        resized = []
         for idx in spread:
             path = image_paths[idx] if idx < len(image_paths) else None
             if path and os.path.exists(path):
                 try:
-                    imgs.append(Image.open(path).convert("RGB"))
+                    resized.append(_load_small_thumb(path, h))
                 except Exception:
-                    imgs.append(None)
+                    resized.append(None)
             else:
-                imgs.append(None)
-
-        h = PREVIEW_PAGE_HEIGHT
-        resized = []
-        for im in imgs:
-            if im is None:
                 resized.append(None)
-                continue
-            w = max(1, round(im.width * h / im.height))
-            resized.append(im.resize((w, h), Image.LANCZOS))
 
         total_w = sum((im.width if im else int(h * 0.71)) for im in resized) or 1
         canvas = Image.new("RGB", (total_w, h), (40, 40, 40))
