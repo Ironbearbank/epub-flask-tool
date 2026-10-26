@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>marche epubツール</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header>
+  <h1>marche epubツール</h1>
+  <p>フォトブック(epub)のQAチェック / 画像フォルダからのepub新規生成</p>
+</header>
+<main>
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      {% for m in messages %}
+        <div class="flash">{{ m }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="card">
+    <h2>① epubをチェックする</h2>
+    <div class="desc">入稿されたepub(またはこのツールで作ったepub)の解像度・比率・ファイル名・見開き構成を確認します。</div>
+    <form action="{{ url_for('check') }}" method="post" enctype="multipart/form-data">
+      <label>epubファイル</label>
+      <input type="file" name="epub_file" accept=".epub" required>
+      <button type="submit">チェックする</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>② 画像からepubを新規生成する</h2>
+    <div class="desc">
+      個別のページ画像(表紙は任意)から、marche_viewerで安定動作する形式のepubを作成します。
+      表示したい順番で画像を選択してください(順番は下のリストで後から並び替えもできます)。
+    </div>
+    <form action="{{ url_for('build') }}" method="post" enctype="multipart/form-data" id="build-form">
+      <label>タイトル</label>
+      <input type="text" name="title" placeholder="例: ○○○○ デジタル写真集「△△△△」" required>
+
+      <label>表紙画像(任意)</label>
+      <input type="file" name="cover_file" accept="image/*">
+      <div class="hint">指定しない場合は表紙なしの本として作成します。</div>
+
+      <label>本文ページ画像(表示したい順に複数選択)</label>
+      <input type="file" id="page-files-input" accept="image/*" multiple>
+      <div class="hint">まとめて選択した場合、選択順がそのまま表示順になります。下のリストで▲▼を押すと並び替えられます。</div>
+      <ul id="page-order-list"></ul>
+
+      <details>
+        <summary>詳細設定(通常は変更不要)</summary>
+        <label>ページ送り方向</label>
+        <select name="direction">
+          <option value="rtl" selected>右から左(rtl・写真集/コミック向け、既定)</option>
+          <option value="ltr">左から右(ltr)</option>
+        </select>
+        <label>表紙直後の1ページ目のside</label>
+        <select name="first_side">
+          <option value="left" selected>left(既定)</option>
+          <option value="right">right</option>
+        </select>
+      </details>
+
+      <button type="submit">epubを生成してダウンロード</button>
+    </form>
+  </div>
+</main>
+
+<script>
+(function () {
+  const input = document.getElementById('page-files-input');
+  const list = document.getElementById('page-order-list');
+  const form = document.getElementById('build-form');
+  let files = [];
+
+  function render() {
+    list.innerHTML = '';
+    files.forEach((f, i) => {
+      const li = document.createElement('li');
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = `${i + 1}. ${f.name}`;
+      const btns = document.createElement('span');
+      btns.className = 'btns';
+
+      const up = document.createElement('button');
+      up.type = 'button';
+      up.textContent = '▲';
+      up.disabled = i === 0;
+      up.onclick = () => { [files[i - 1], files[i]] = [files[i], files[i - 1]]; render(); };
+
+      const down = document.createElement('button');
+      down.type = 'button';
+      down.textContent = '▼';
+      down.disabled = i === files.length - 1;
+      down.onclick = () => { [files[i + 1], files[i]] = [files[i], files[i + 1]]; render(); };
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.textContent = '✕';
+      del.onclick = () => { files.splice(i, 1); render(); };
+
+      btns.appendChild(up);
+      btns.appendChild(down);
+      btns.appendChild(del);
+      li.appendChild(name);
+      li.appendChild(btns);
+      list.appendChild(li);
+    });
+  }
+
+  input.addEventListener('change', () => {
+    files = files.concat(Array.from(input.files));
+    input.value = '';
+    render();
+  });
+
+  form.addEventListener('submit', (e) => {
+    if (files.length === 0) {
+      e.preventDefault();
+      alert('本文ページ画像を選択してください。');
+      return;
+    }
+    const dt = new DataTransfer();
+    files.forEach(f => dt.items.add(f));
+    // hidden input to carry the ordered files, since the visible
+    // #page-files-input is just a picker and gets cleared after each selection
+    let hidden = form.querySelector('input[name="page_files"]');
+    if (!hidden) {
+      hidden = document.createElement('input');
+      hidden.type = 'file';
+      hidden.name = 'page_files';
+      hidden.multiple = true;
+      hidden.style.display = 'none';
+      form.appendChild(hidden);
+    }
+    hidden.files = dt.files;
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>チェック結果 - marche epubツール</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header>
+  <h1>marche epubツール</h1>
+  <p>チェック結果</p>
+</header>
+<main>
+  <div class="card">
+    <h2>{{ filename }}</h2>
+
+    {% if result.fatal_error %}
+      <div class="flash">{{ result.fatal_error }}</div>
+    {% else %}
+      <table>
+        <tr><th>総ページ数</th><td>{{ result.total_pages }}</td></tr>
+        <tr><th>固定レイアウト viewport</th><td>{{ result.viewport if result.viewport else '検出できず(fixed-layoutではない可能性)' }}</td></tr>
+        <tr><th>目標アスペクト比</th><td>{{ result.target_ratio }} ({{ result.ratio_source }})</td></tr>
+        <tr><th>最頻出の解像度</th><td>{{ result.mode_dim[0] }}x{{ result.mode_dim[1] }} ({{ result.mode_count }}枚)</td></tr>
+      </table>
+
+      <p style="margin-top:18px;">
+        {% if result.ok %}
+          <span class="badge ok">OK</span> 全画像の解像度・比率・ファイル名に問題は見つかりませんでした。
+        {% else %}
+          <span class="badge ng">NG</span> {{ result.issues|length }}件の問題を検出しました。
+        {% endif %}
+      </p>
+
+      {% if result.spread_warnings %}
+        {% for w in result.spread_warnings %}
+          <div class="warn-box">⚠ {{ w }}</div>
+        {% endfor %}
+      {% endif %}
+
+      <table>
+        <tr><th>ページ</th><th>ファイル</th><th>WxH</th><th>比率</th><th>DPI</th><th>KB</th><th>フラグ</th></tr>
+        {% for r in result.records %}
+          <tr>
+            <td>{{ r.page }}</td>
+            <td>{{ r.file }}</td>
+            <td>{% if r.w %}{{ r.w }}x{{ r.h }}{% endif %}</td>
+            <td>{% if r.ratio %}{{ '%.4f'|format(r.ratio) }}{% endif %}</td>
+            <td>{{ r.dpi if r.dpi else '' }}</td>
+            <td>{{ r.size_kb if r.size_kb else '' }}</td>
+            <td class="flag">{{ r.flags|join(', ') if r.flags else '' }}</td>
+          </tr>
+        {% endfor %}
+      </table>
+    {% endif %}
+
+    <a class="back" href="{{ url_for('index') }}">← トップに戻る</a>
+  </div>
+</main>
+</body>
+</html>
