@@ -172,14 +172,11 @@ def collect_representative_images(opf_dir, spine_hrefs):
 def group_into_spreads(spine_properties):
     """spineのproperties列から、見開き(1〜2ページ)のグルーピングを推定する。
 
-    ルール(今回のFRUiTS対応で実機確認した挙動をもとにしたヒューリスティック):
+    ルール(FRUiTS_final.epubの実機確認動画で裏付け済み):
     - page-spread-center(表紙など) は常に単独。
-    - 表紙(center)の直後2ページは、left/rightプロパティに関わらず
-      常にそれぞれ単独表示になる(実機確認済み。bubka等の「表紙の次は
-      1ページだけ単独」パターンに近いが、FRUiTSでは2ページ分だった)。
-    - それ以降は、page-spread-left の直後に page-spread-right が続く
-      場合のみペアになる。それ以外(連続するleft/連続するright等)は
-      単独ページとして扱う。
+    - それ以外は、page-spread-left の直後に page-spread-right が続く
+      場合のみペアになる(表紙の直後であっても特例なく同じ判定)。
+      それ以外(連続するleft/連続するright等)は単独ページとして扱う。
 
     あくまで簡易プレビュー用の近似であり、実際のmarche_viewer表示を
     100%保証するものではない(実機確認は別途必須)。
@@ -187,18 +184,11 @@ def group_into_spreads(spine_properties):
     spreads = []
     i = 0
     n = len(spine_properties)
-    just_after_center = 0  # 表紙直後、残り何ページを強制的に単独扱いするか
     while i < n:
         prop = spine_properties[i]
         if "page-spread-center" in prop:
             spreads.append([i])
             i += 1
-            just_after_center = 2
-            continue
-        if just_after_center > 0:
-            spreads.append([i])
-            i += 1
-            just_after_center -= 1
             continue
         if "page-spread-left" in prop and i + 1 < n and "page-spread-right" in spine_properties[i + 1]:
             spreads.append([i, i + 1])
