@@ -236,7 +236,10 @@ def build_preview_thumbnails(image_paths, spreads, max_spreads=20):
     h = PREVIEW_PAGE_HEIGHT
     for n, spread in enumerate(spreads[:max_spreads]):
         resized = []
-        for idx in spread:
+        # marche_viewerは右開き(RTL)表示のため、見開き内では
+        # spine順で後ろのページを画面左、前のページを画面右に置く
+        # (実機動画で確認済み)。
+        for idx in reversed(spread):
             path = image_paths[idx] if idx < len(image_paths) else None
             if path and os.path.exists(path):
                 try:
