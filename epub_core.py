@@ -218,7 +218,7 @@ def _load_small_thumb(path, target_h):
     return thumb
 
 
-def build_preview_thumbnails(image_paths, spreads, max_spreads=20):
+def build_preview_thumbnails(image_paths, spreads, max_spreads=10):
     """見開きごとのサムネイル(base64 JPEG)のリストを返す。
 
     image_paths: spine順の代表画像パスのリスト(Noneもあり得る)
@@ -270,7 +270,7 @@ def build_preview_thumbnails(image_paths, spreads, max_spreads=20):
     return thumbs, truncated
 
 
-def build_mobile_preview_thumbnails(image_paths, max_pages=20):
+def build_mobile_preview_thumbnails(image_paths, max_pages=10):
     """携帯(スマホ)でmarche_viewerを見た場合のプレビュー。
 
     実機確認の結果、携帯では見開きペアリングという概念自体がなく、

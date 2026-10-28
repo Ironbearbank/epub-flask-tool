@@ -61,11 +61,11 @@
           見え方と完全に一致するとは限らないため、最終的には実機でも必ずご確認ください。
         </div>
         {% if result.preview_truncated %}
-          <p class="hint">ページ数が多いため、プレビューは先頭部分のみ表示しています。</p>
+          <p class="hint">先頭10見開きのみ表示しています。</p>
         {% endif %}
-        <div style="margin-top:16px;">
+        <div style="margin-top:16px; display:flex; flex-wrap:wrap; gap:14px; overflow-x:auto;">
           {% for thumb in result.preview_thumbs %}
-            <div style="margin-bottom:14px;">
+            <div style="flex:0 0 auto; max-width:220px;">
               <img src="data:image/jpeg;base64,{{ thumb }}" style="max-width:100%; border:1px solid #ddd; border-radius:4px;">
             </div>
           {% endfor %}
@@ -80,11 +80,11 @@
           シミュレーションのため、最終的には実機でも必ずご確認ください。
         </div>
         {% if result.mobile_preview_truncated %}
-          <p class="hint">ページ数が多いため、プレビューは先頭部分のみ表示しています。</p>
+          <p class="hint">先頭10ページのみ表示しています。</p>
         {% endif %}
-        <div style="margin-top:16px;">
+        <div style="margin-top:16px; display:flex; flex-wrap:wrap; gap:14px; overflow-x:auto;">
           {% for thumb in result.mobile_preview_thumbs %}
-            <div style="margin-bottom:14px; max-width:320px;">
+            <div style="flex:0 0 auto; max-width:160px;">
               <img src="data:image/jpeg;base64,{{ thumb }}" style="max-width:100%; border:1px solid #ddd; border-radius:4px;">
             </div>
           {% endfor %}
