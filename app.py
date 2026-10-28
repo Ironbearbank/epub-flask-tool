@@ -18,6 +18,17 @@ _PENDING_DOWNLOADS = {}
 _DOWNLOAD_TTL_SECONDS = 60 * 60  # 1時間で破棄
 
 
+def _safe_filename_stem(name):
+    """ダウンロードファイル名用に、ASCII英数字・半角スペース・_-のみ残す。
+
+    marcheへのアップロード時、日本語等の非ASCII文字を含むファイル名は
+    エラーの原因になりやすいため、isalnum()(日本語等も含んでしまう)
+    ではなく明示的にASCIIのみに限定する。
+    """
+    cleaned = "".join(c for c in name if c.isascii() and (c.isalnum() or c in " _-"))
+    return cleaned.strip() or "output"
+
+
 def _cleanup_pending_downloads():
     now = time.time()
     expired = [t for t, v in _PENDING_DOWNLOADS.items() if now - v["created"] > _DOWNLOAD_TTL_SECONDS]
@@ -105,7 +116,7 @@ def build():
 
         # ダウンロード用ファイルは、このリクエスト用の一時ディレクトリの外
         # (プロセス全体で共有する場所)に保存し、TemporaryDirectory終了後も残す。
-        safe_title = "".join(c for c in title if c.isalnum() or c in " _-") or "output"
+        safe_title = _safe_filename_stem(title)
         download_name = f"{safe_title}.epub"
         token = uuid.uuid4().hex
         persist_dir = tempfile.mkdtemp(prefix="epub_build_result_")
@@ -159,7 +170,7 @@ def rebuild():
         epub_path = os.path.join(tmp, file.filename)
         file.save(epub_path)
 
-        safe_stem = "".join(c for c in os.path.splitext(file.filename)[0] if c.isalnum() or c in " _-") or "output"
+        safe_stem = _safe_filename_stem(title_override or os.path.splitext(file.filename)[0])
         download_name = f"{safe_stem}_rebuilt.epub"
         token = uuid.uuid4().hex
         persist_dir = tempfile.mkdtemp(prefix="epub_build_result_")
