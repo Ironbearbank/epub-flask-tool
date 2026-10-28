@@ -270,6 +270,39 @@ def build_preview_thumbnails(image_paths, spreads, max_spreads=20):
     return thumbs, truncated
 
 
+def build_mobile_preview_thumbnails(image_paths, max_pages=20):
+    """携帯(スマホ)でmarche_viewerを見た場合のプレビュー。
+
+    実機確認の結果、携帯では見開きペアリングという概念自体がなく、
+    spine順に1アイテムずつ、そのページの画像自身のアスペクト比のまま
+    表示される(横長の画像ならそのまま横長の1ページとして表示される)。
+    そのためPC向けbuild_preview_thumbnails()のような見開きグルーピング
+    は行わず、単純にspine順へ1枚ずつサムネイル化する。
+    """
+    import gc
+
+    thumbs = []
+    truncated = len(image_paths) > max_pages
+    h = PREVIEW_PAGE_HEIGHT
+    for n, path in enumerate(image_paths[:max_pages]):
+        if not (path and os.path.exists(path)):
+            continue
+        try:
+            im = _load_small_thumb(path, h)
+        except Exception:
+            continue
+
+        buf = io.BytesIO()
+        im.save(buf, format="JPEG", quality=80)
+        thumbs.append(base64.b64encode(buf.getvalue()).decode("ascii"))
+
+        del im, buf
+        if n % 4 == 3:
+            gc.collect()
+
+    return thumbs, truncated
+
+
 def check_spread_structure(spine_properties, generator):
     warnings = []
     is_indesign = "indesign" in generator.lower()
@@ -370,6 +403,7 @@ def run_qa_check(epub_path, tolerance=0.01):
         spreads = group_into_spreads(spine_properties)
         rep_images = collect_representative_images(opf_dir, spine_hrefs)
         preview_thumbs, preview_truncated = build_preview_thumbnails(rep_images, spreads)
+        mobile_preview_thumbs, mobile_preview_truncated = build_mobile_preview_thumbnails(rep_images)
 
         return {
             "total_pages": len(records),
@@ -384,6 +418,8 @@ def run_qa_check(epub_path, tolerance=0.01):
             "ok": not issues,
             "preview_thumbs": preview_thumbs,
             "preview_truncated": preview_truncated,
+            "mobile_preview_thumbs": mobile_preview_thumbs,
+            "mobile_preview_truncated": mobile_preview_truncated,
         }
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -531,6 +567,7 @@ def build_epub_from_images(page_paths, cover_path, title, output_path,
 
         spreads = group_into_spreads(spine_properties)
         preview_thumbs, preview_truncated = build_preview_thumbnails(rep_image_paths, spreads)
+        mobile_preview_thumbs, mobile_preview_truncated = build_mobile_preview_thumbnails(rep_image_paths)
 
         return {
             "pages": len(page_paths),
@@ -538,6 +575,8 @@ def build_epub_from_images(page_paths, cover_path, title, output_path,
             "has_cover": bool(cover_path),
             "preview_thumbs": preview_thumbs,
             "preview_truncated": preview_truncated,
+            "mobile_preview_thumbs": mobile_preview_thumbs,
+            "mobile_preview_truncated": mobile_preview_truncated,
         }
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)

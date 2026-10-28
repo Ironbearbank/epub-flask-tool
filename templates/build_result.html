@@ -24,7 +24,8 @@
       <button type="button">epubをダウンロード</button>
     </a>
 
-    <div class="warn-box" style="margin-top:20px;">
+    <h2 style="margin-top:28px;">PCで見た場合のプレビュー(見開き・簡易シミュレーション)</h2>
+    <div class="warn-box" style="margin-top:12px;">
       ⚠ 下のプレビューは見開き構成の簡易シミュレーションです。実際のmarche_viewer
       での見え方と完全に一致するとは限らないため、最終的には実機(marche_viewer)
       でも必ずご確認ください。
@@ -41,6 +42,25 @@
         </div>
       {% endfor %}
     </div>
+
+    {% if result.mobile_preview_thumbs %}
+      <h2 style="margin-top:32px;">携帯で見た場合のプレビュー(1ページずつ)</h2>
+      <div class="warn-box">
+        ⚠ 携帯では見開きペアリングはされず、spine順に1ページずつ、画像自身のアスペクト比
+        のまま表示されます(横長の画像はそのまま横長の1ページとして表示)。こちらも簡易
+        シミュレーションのため、最終的には実機でも必ずご確認ください。
+      </div>
+      {% if result.mobile_preview_truncated %}
+        <p class="hint">ページ数が多いため、プレビューは先頭部分のみ表示しています。</p>
+      {% endif %}
+      <div style="margin-top:16px;">
+        {% for thumb in result.mobile_preview_thumbs %}
+          <div style="margin-bottom:14px; max-width:320px;">
+            <img src="data:image/jpeg;base64,{{ thumb }}" style="max-width:100%; border:1px solid #ddd; border-radius:4px;">
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
 
     <a class="back" href="{{ url_for('index') }}">← トップに戻る</a>
   </div>
