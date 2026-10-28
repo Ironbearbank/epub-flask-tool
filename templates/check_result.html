@@ -39,6 +39,16 @@
         {% endfor %}
       {% endif %}
 
+      {% if result.has_resolution_issue %}
+        <div class="warn-box">
+          ⚠ 解像度が揃っていないページがあります。このツールの「②画像からepubを新規生成する」
+          機能で元のページ画像を読み込み直すと、最頻出の解像度に自動で統一されます。
+          <div style="margin-top:10px;">
+            <a href="{{ url_for('index') }}#build-section"><button type="button">②epub生成セクションへ</button></a>
+          </div>
+        </div>
+      {% endif %}
+
       <table>
         <tr><th>ページ</th><th>ファイル</th><th>WxH</th><th>比率</th><th>DPI</th><th>KB</th><th>フラグ</th></tr>
         {% for r in result.records %}

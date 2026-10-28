@@ -399,6 +399,7 @@ def run_qa_check(epub_path, tolerance=0.01):
                 issues.append(f"{r['page']} ({r['file']}): {', '.join(flags)}")
 
         spread_warnings = check_spread_structure(spine_properties, generator)
+        has_resolution_issue = any("解像度" in f for r in records for f in r["flags"])
 
         spreads = group_into_spreads(spine_properties)
         rep_images = collect_representative_images(opf_dir, spine_hrefs)
@@ -415,6 +416,7 @@ def run_qa_check(epub_path, tolerance=0.01):
             "records": records,
             "issues": issues,
             "spread_warnings": spread_warnings,
+            "has_resolution_issue": has_resolution_issue,
             "ok": not issues,
             "preview_thumbs": preview_thumbs,
             "preview_truncated": preview_truncated,
