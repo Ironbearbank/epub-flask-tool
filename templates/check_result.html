@@ -54,40 +54,39 @@
         {% endfor %}
       </table>
 
-      {% if result.preview_thumbs %}
-        <h2 style="margin-top:32px;">PCで見た場合のプレビュー(見開き・簡易シミュレーション)</h2>
+      {% if result.preview_thumbs or result.mobile_preview_thumbs %}
+        <h2 style="margin-top:32px;">プレビュー(PC表示 / 携帯表示の見比べ)</h2>
         <div class="warn-box">
-          ⚠ spineのプロパティから推定した簡易プレビューです。実際のmarche_viewerでの
+          ⚠ spineの構成から推定した簡易シミュレーションです。実際のmarche_viewerでの
           見え方と完全に一致するとは限らないため、最終的には実機でも必ずご確認ください。
         </div>
-        {% if result.preview_truncated %}
-          <p class="hint">先頭10見開きのみ表示しています。</p>
-        {% endif %}
-        <div style="margin-top:16px;">
-          {% for thumb in result.preview_thumbs %}
-            <div style="margin-bottom:14px;">
-              <img src="data:image/jpeg;base64,{{ thumb }}" style="max-width:100%; border:1px solid #ddd; border-radius:4px;">
+        <div style="margin-top:16px; display:flex; gap:32px; align-items:flex-start; overflow-x:auto;">
+          {% if result.preview_thumbs %}
+            <div style="flex:0 0 auto;">
+              <h3>PCで見た場合(見開き)</h3>
+              {% if result.preview_truncated %}
+                <p class="hint">先頭10見開きのみ表示しています。</p>
+              {% endif %}
+              {% for thumb in result.preview_thumbs %}
+                <div style="margin-bottom:14px; max-width:420px;">
+                  <img src="data:image/jpeg;base64,{{ thumb }}" style="max-width:100%; border:1px solid #ddd; border-radius:4px;">
+                </div>
+              {% endfor %}
             </div>
-          {% endfor %}
-        </div>
-      {% endif %}
-
-      {% if result.mobile_preview_thumbs %}
-        <h2 style="margin-top:32px;">携帯で見た場合のプレビュー(1ページずつ)</h2>
-        <div class="warn-box">
-          ⚠ 携帯では見開きペアリングはされず、spine順に1ページずつ、画像自身のアスペクト比
-          のまま表示されます(横長の画像はそのまま横長の1ページとして表示)。こちらも簡易
-          シミュレーションのため、最終的には実機でも必ずご確認ください。
-        </div>
-        {% if result.mobile_preview_truncated %}
-          <p class="hint">先頭10ページのみ表示しています。</p>
-        {% endif %}
-        <div style="margin-top:16px; display:flex; flex-wrap:wrap; gap:14px; overflow-x:auto;">
-          {% for thumb in result.mobile_preview_thumbs %}
-            <div style="flex:0 0 auto; max-width:160px;">
-              <img src="data:image/jpeg;base64,{{ thumb }}" style="max-width:100%; border:1px solid #ddd; border-radius:4px;">
+          {% endif %}
+          {% if result.mobile_preview_thumbs %}
+            <div style="flex:0 0 auto;">
+              <h3>携帯で見た場合(1ページずつ)</h3>
+              {% if result.mobile_preview_truncated %}
+                <p class="hint">先頭10ページのみ表示しています。</p>
+              {% endif %}
+              {% for thumb in result.mobile_preview_thumbs %}
+                <div style="margin-bottom:14px; max-width:260px;">
+                  <img src="data:image/jpeg;base64,{{ thumb }}" style="max-width:100%; border:1px solid #ddd; border-radius:4px;">
+                </div>
+              {% endfor %}
             </div>
-          {% endfor %}
+          {% endif %}
         </div>
       {% endif %}
     {% endif %}
