@@ -35,8 +35,14 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/check", methods=["POST"])
+@app.route("/check", methods=["GET", "POST"])
 def check():
+    if request.method == "GET":
+        # 結果画面でリロードするとフォーム再送信ではなくGETになり、
+        # POST専用ルートのままだと405エラーになるため、トップに戻す。
+        flash("再度チェックする場合はファイルを選択してください。")
+        return redirect(url_for("index"))
+
     file = request.files.get("epub_file")
     if not file or file.filename == "":
         flash("epubファイルを選択してください。")
@@ -58,8 +64,12 @@ def check():
     return render_template("check_result.html", filename=file.filename, result=result)
 
 
-@app.route("/build", methods=["POST"])
+@app.route("/build", methods=["GET", "POST"])
 def build():
+    if request.method == "GET":
+        flash("再度生成する場合は画像を選択してください。")
+        return redirect(url_for("index"))
+
     _cleanup_pending_downloads()
 
     title = request.form.get("title", "").strip()
