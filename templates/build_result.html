@@ -35,9 +35,9 @@
       <p class="hint">先頭10見開きのみ表示しています。</p>
     {% endif %}
 
-    <div style="margin-top:20px; display:flex; flex-wrap:wrap; gap:14px; overflow-x:auto;">
+    <div style="margin-top:20px;">
       {% for thumb in result.preview_thumbs %}
-        <div style="flex:0 0 auto; max-width:220px;">
+        <div style="margin-bottom:14px;">
           <img src="data:image/jpeg;base64,{{ thumb }}" style="max-width:100%; border:1px solid #ddd; border-radius:4px;">
         </div>
       {% endfor %}
