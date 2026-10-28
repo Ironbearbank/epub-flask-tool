@@ -135,6 +135,60 @@ def build():
     )
 
 
+@app.route("/rebuild", methods=["GET", "POST"])
+def rebuild():
+    if request.method == "GET":
+        flash("再度実行する場合はepubファイルを選択してください。")
+        return redirect(url_for("index"))
+
+    _cleanup_pending_downloads()
+
+    file = request.files.get("source_epub_file")
+    if not file or file.filename == "":
+        flash("再生成元のepubファイルを選択してください。")
+        return redirect(url_for("index"))
+    if not file.filename.lower().endswith(".epub"):
+        flash("拡張子が.epubのファイルを選択してください。")
+        return redirect(url_for("index"))
+
+    title_override = request.form.get("title", "").strip() or None
+    direction = request.form.get("direction", "rtl")
+    first_side = request.form.get("first_side", "left")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        epub_path = os.path.join(tmp, file.filename)
+        file.save(epub_path)
+
+        safe_stem = "".join(c for c in os.path.splitext(file.filename)[0] if c.isalnum() or c in " _-") or "output"
+        download_name = f"{safe_stem}_rebuilt.epub"
+        token = uuid.uuid4().hex
+        persist_dir = tempfile.mkdtemp(prefix="epub_build_result_")
+        output_path = os.path.join(persist_dir, "output.epub")
+
+        try:
+            result = epub_core.rebuild_epub_from_existing(
+                epub_path, output_path, title_override=title_override,
+                direction=direction, first_side=first_side,
+            )
+        except Exception as e:
+            traceback.print_exc()
+            flash(f"再生成中にエラーが発生しました: {e}")
+            return redirect(url_for("index"))
+
+    _PENDING_DOWNLOADS[token] = {
+        "path": output_path,
+        "filename": download_name,
+        "created": time.time(),
+    }
+
+    return render_template(
+        "build_result.html",
+        title=title_override or file.filename,
+        result=result,
+        download_token=token,
+    )
+
+
 @app.route("/download/<token>")
 def download(token):
     entry = _PENDING_DOWNLOADS.get(token)

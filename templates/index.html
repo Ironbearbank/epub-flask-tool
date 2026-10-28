@@ -66,6 +66,38 @@
       <button type="submit">epubを生成してダウンロード</button>
     </form>
   </div>
+
+  <div class="card" id="rebuild-section">
+    <h2>③ 不適合だったepubを再生成する</h2>
+    <div class="desc">
+      ①のチェックでNGだったepub(解像度不一致など)をそのままアップロードすると、
+      中のページ画像を自動で取り出し、解像度を統一して作り直します。
+      ページ順や表紙の有無は元のepubのまま引き継がれます。
+    </div>
+    <form action="{{ url_for('rebuild') }}" method="post" enctype="multipart/form-data">
+      <label>NGだったepubファイル</label>
+      <input type="file" name="source_epub_file" accept=".epub" required>
+
+      <label>タイトル(任意、空欄なら元epubの情報から自動設定)</label>
+      <input type="text" name="title" placeholder="例: ○○○○ デジタル写真集「△△△△」">
+
+      <details>
+        <summary>詳細設定(通常は変更不要)</summary>
+        <label>ページ送り方向</label>
+        <select name="direction">
+          <option value="rtl" selected>右から左(rtl・写真集/コミック向け、既定)</option>
+          <option value="ltr">左から右(ltr)</option>
+        </select>
+        <label>表紙直後の1ページ目のside</label>
+        <select name="first_side">
+          <option value="left" selected>left(既定)</option>
+          <option value="right">right</option>
+        </select>
+      </details>
+
+      <button type="submit">再生成してダウンロード</button>
+    </form>
+  </div>
 </main>
 
 <script>

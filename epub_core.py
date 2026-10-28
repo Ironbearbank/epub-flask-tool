@@ -582,3 +582,57 @@ def build_epub_from_images(page_paths, cover_path, title, output_path,
         }
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
+
+
+# ---------- 既存epubからの再生成 (チェックNG時の救済導線) ----------
+
+def extract_title_from_opf(opf_path):
+    tree = ET.parse(opf_path)
+    root = tree.getroot()
+    dc_ns = "{http://purl.org/dc/elements/1.1/}"
+    title_el = root.find(f".//{dc_ns}title")
+    if title_el is not None and title_el.text:
+        return title_el.text.strip()
+    return None
+
+
+def rebuild_epub_from_existing(epub_path, output_path, title_override=None,
+                                direction="rtl", first_side="left"):
+    """チェックでNGだった既存epubから、ページ画像を自動抽出してそのまま
+    再生成する(解像度不一致・比率不一致などを、build_epub_from_images()の
+    正規化ロジックで解消する救済導線)。
+
+    page-spread-center(表紙)が先頭にある場合は表紙として扱い、それ以外は
+    spine順の本文ページとして渡す。
+    """
+    tmp_dir = tempfile.mkdtemp(prefix="epub_extract_")
+    try:
+        with zipfile.ZipFile(epub_path) as z:
+            z.extractall(tmp_dir)
+
+        opf_path = find_opf_path(tmp_dir)
+        opf_dir = os.path.dirname(opf_path)
+        manifest, spine_hrefs, duplicate_ids, spine_properties, generator = parse_opf(opf_path)
+        if not spine_hrefs:
+            raise ValueError("spineから画像を1件も検出できませんでした。EPUB構造を確認してください。")
+
+        rep_images = collect_representative_images(opf_dir, spine_hrefs)
+
+        cover_path = None
+        page_paths = rep_images
+        if spine_properties and "page-spread-center" in spine_properties[0]:
+            cover_path = rep_images[0]
+            page_paths = rep_images[1:]
+
+        page_paths = [p for p in page_paths if p]
+        if not page_paths:
+            raise ValueError("本文ページとして使える画像が見つかりませんでした。")
+
+        title = title_override or extract_title_from_opf(opf_path) or os.path.splitext(os.path.basename(epub_path))[0]
+
+        return build_epub_from_images(
+            page_paths, cover_path, title, output_path,
+            direction=direction, first_side=first_side,
+        )
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)

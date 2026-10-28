@@ -41,10 +41,11 @@
 
       {% if result.has_resolution_issue %}
         <div class="warn-box">
-          ⚠ 解像度が揃っていないページがあります。このツールの「②画像からepubを新規生成する」
-          機能で元のページ画像を読み込み直すと、最頻出の解像度に自動で統一されます。
+          ⚠ 解像度が揃っていないページがあります。このツールの「③不適合だったepubを再生成する」
+          に今チェックしたepubをそのままアップロードすると、ページ画像を自動で取り出して
+          解像度を統一した状態で作り直せます。
           <div style="margin-top:10px;">
-            <a href="{{ url_for('index') }}#build-section"><button type="button">②epub生成セクションへ</button></a>
+            <a href="{{ url_for('index') }}#rebuild-section"><button type="button">③再生成セクションへ</button></a>
           </div>
         </div>
       {% endif %}
