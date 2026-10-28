@@ -12,6 +12,14 @@
   <p>生成結果プレビュー</p>
 </header>
 <main>
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      {% for m in messages %}
+        <div class="flash">{{ m }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
   <div class="card">
     <h2>{{ title }}</h2>
     <table>

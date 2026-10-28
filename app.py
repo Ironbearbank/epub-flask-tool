@@ -117,6 +117,10 @@ def build():
         # ダウンロード用ファイルは、このリクエスト用の一時ディレクトリの外
         # (プロセス全体で共有する場所)に保存し、TemporaryDirectory終了後も残す。
         safe_title = _safe_filename_stem(title)
+        if safe_title == "output":
+            flash("タイトルに日本語など英数字以外しか含まれていなかったため、ファイル名は自動的に"
+                  "「output.epub」になりました。marcheでのアップロードエラーを避けたい場合は、"
+                  "英数字のタイトルを入力し直すことをおすすめします。")
         download_name = f"{safe_title}.epub"
         token = uuid.uuid4().hex
         persist_dir = tempfile.mkdtemp(prefix="epub_build_result_")
@@ -171,6 +175,10 @@ def rebuild():
         file.save(epub_path)
 
         safe_stem = _safe_filename_stem(title_override or os.path.splitext(file.filename)[0])
+        if safe_stem == "output":
+            flash("タイトル(または元のファイル名)に日本語など英数字以外しか含まれていなかったため、"
+                  "ファイル名は自動的に「output_rebuilt.epub」になりました。marcheでのアップロード"
+                  "エラーを避けたい場合は、タイトル欄に英数字のタイトルを入力することをおすすめします。")
         download_name = f"{safe_stem}_rebuilt.epub"
         token = uuid.uuid4().hex
         persist_dir = tempfile.mkdtemp(prefix="epub_build_result_")
