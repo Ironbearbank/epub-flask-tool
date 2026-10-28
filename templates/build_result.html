@@ -52,8 +52,8 @@
               <p class="hint">先頭10ページのみ表示しています。</p>
             {% endif %}
             {% for thumb in result.mobile_preview_thumbs %}
-              <div style="margin-bottom:14px; max-width:260px;">
-                <img src="data:image/jpeg;base64,{{ thumb }}" style="max-width:100%; border:1px solid #ddd; border-radius:4px;">
+              <div style="margin-bottom:14px; max-width:260px; aspect-ratio:0.85; background:#000; display:flex; align-items:center; justify-content:center; border-radius:4px; overflow:hidden;">
+                <img src="data:image/jpeg;base64,{{ thumb }}" style="max-width:100%; max-height:100%; object-fit:contain;">
               </div>
             {% endfor %}
           </div>
