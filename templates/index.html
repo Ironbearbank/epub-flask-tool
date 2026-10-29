@@ -23,7 +23,7 @@
   <div class="card">
     <h2>① epubをチェックする</h2>
     <div class="desc">入稿されたepub(またはこのツールで作ったepub)の解像度・比率・ファイル名・見開き構成を確認します。</div>
-    <form action="{{ url_for('check') }}" method="post" enctype="multipart/form-data">
+    <form action="{{ url_for('check') }}" method="post" enctype="multipart/form-data" id="check-form">
       <label>epubファイル</label>
       <input type="file" name="epub_file" accept=".epub" required>
       <button type="submit">チェックする</button>
@@ -75,7 +75,7 @@
       中のページ画像を自動で取り出し、解像度を統一して作り直します。
       ページ順や表紙の有無は元のepubのまま引き継がれます。
     </div>
-    <form action="{{ url_for('rebuild') }}" method="post" enctype="multipart/form-data">
+    <form action="{{ url_for('rebuild') }}" method="post" enctype="multipart/form-data" id="rebuild-form">
       <label>NGだったepubファイル</label>
       <input type="file" name="source_epub_file" accept=".epub" required>
 
@@ -101,6 +101,42 @@
     </form>
   </div>
 </main>
+
+<div id="progress-overlay">
+  <div class="spinner"></div>
+  <div class="progress-label" id="progress-label">チェック中...</div>
+  <div class="progress-time" id="progress-time">0秒経過</div>
+</div>
+
+<script>
+(function () {
+  const overlay = document.getElementById('progress-overlay');
+  const label = document.getElementById('progress-label');
+  const timeEl = document.getElementById('progress-time');
+  let timer = null;
+
+  function showProgress(text) {
+    label.textContent = text;
+    let seconds = 0;
+    timeEl.textContent = '0秒経過';
+    overlay.classList.add('active');
+    timer = setInterval(() => {
+      seconds += 1;
+      timeEl.textContent = `${seconds}秒経過`;
+    }, 1000);
+  }
+
+  // 無料プランはコールドスタートで最初のアクセスに30〜60秒ほどかかる
+  // ことがあるため、時間がかかっても固まったわけではないことが
+  // 分かるよう経過秒数を見せる。
+  document.getElementById('check-form').addEventListener('submit', () => {
+    showProgress('チェック中...');
+  });
+  document.getElementById('rebuild-form').addEventListener('submit', () => {
+    showProgress('再生成中...');
+  });
+})();
+</script>
 
 <script>
 (function () {
@@ -171,6 +207,15 @@
       form.appendChild(hidden);
     }
     hidden.files = dt.files;
+
+    document.getElementById('progress-label').textContent = '生成中...';
+    document.getElementById('progress-time').textContent = '0秒経過';
+    let seconds = 0;
+    document.getElementById('progress-overlay').classList.add('active');
+    setInterval(() => {
+      seconds += 1;
+      document.getElementById('progress-time').textContent = `${seconds}秒経過`;
+    }, 1000);
   });
 })();
 </script>
